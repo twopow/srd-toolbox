@@ -5,9 +5,9 @@ import { system } from "@/theme";
 import App from "@/App";
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ChakraProvider value={system}>
-      <App />
-    </ChakraProvider>
-  </StrictMode>
+	<StrictMode>
+		<ChakraProvider value={system}>
+			<App />
+		</ChakraProvider>
+	</StrictMode>,
 );
