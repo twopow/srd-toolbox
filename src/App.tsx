@@ -50,20 +50,6 @@ export default function App() {
             <InspectorSection />
           </Tabs.Content>
         </Tabs.Root>
-
-        <Text
-          fontSize="xs"
-          fontStyle="italic"
-          color="fg.muted"
-          width="100%"
-          textAlign="center"
-          py="4"
-        >
-          Built with care by{" "}
-          <Link href="https://twopow.com" target="_blank">
-            TwoPow
-          </Link>
-        </Text>
       </VStack>
     </Container>
   );
