@@ -88,7 +88,7 @@ export default function AboutSection() {
       >
         Built with care by{" "}
         <Link href="https://twopow.com" target="_blank">
-          TwoPow
+          Twopow
         </Link>
       </Text>
     </VStack>

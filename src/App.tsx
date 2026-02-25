@@ -5,7 +5,6 @@ import {
   Icon,
   Link,
   Tabs,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import AboutSection from "@/components/AboutSection";
