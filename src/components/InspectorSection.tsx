@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	Alert,
 	Box,
@@ -103,6 +103,13 @@ export default function InspectorSection() {
 	const [parsed, setParsed] = useState<SRDRecord | null>(null);
 	const [inspectedHost, setInspectedHost] = useState<string | null>(null);
 
+	const reset = useCallback(() => {
+		setError(null);
+		setRawRecord(null);
+		setParsed(null);
+		setInspectedHost(null);
+	}, []);
+
 	const inspectRecord = (raw: string) => {
 		setRawRecord(raw);
 		try {
@@ -114,32 +121,39 @@ export default function InspectorSection() {
 		}
 	};
 
-	const inspect = async () => {
-		const value = input.trim();
-		if (!value) return;
+	const inspect = useCallback(
+		async (value?: string) => {
+			const v = (value ?? input).trim();
+			if (!v) return;
 
-		setError(null);
-		setRawRecord(null);
-		setParsed(null);
-		setInspectedHost(null);
+			if (v !== input) setInput(v);
 
-		if (looksLikeRecord(value)) {
-			inspectRecord(value);
-			return;
-		}
+			reset();
 
-		setLoading(true);
-		setInspectedHost(value);
+			if (looksLikeRecord(v)) {
+				inspectRecord(v);
+				return;
+			}
 
-		try {
-			const raw = await lookupSRDRecord(value);
-			inspectRecord(raw);
-		} catch (e) {
-			setError(e instanceof Error ? e.message : "Unknown error");
-		} finally {
-			setLoading(false);
-		}
-	};
+			setLoading(true);
+			setInspectedHost(v);
+
+			try {
+				const raw = await lookupSRDRecord(v);
+				inspectRecord(raw);
+			} catch (e) {
+				setError(e instanceof Error ? e.message : "Unknown error");
+			} finally {
+				setLoading(false);
+			}
+		},
+		[input],
+	);
+
+	useEffect(() => {
+		const r = new URLSearchParams(window.location.search).get("r");
+		if (r) inspect(r);
+	}, []);
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter") inspect();
@@ -153,11 +167,14 @@ export default function InspectorSection() {
 					<Input
 						placeholder="Enter a host (a.test.srd.sh) or SRD record (v=srd1; dest=https://example.com)"
 						value={input}
-						onChange={(e) => setInput(e.target.value)}
+						onChange={(e) => {
+							setInput(e.target.value);
+							if (!e.target.value.trim()) reset();
+						}}
 						onKeyDown={handleKeyDown}
 						flex="1"
 					/>
-					<Button onClick={inspect} disabled={loading || !input.trim()}>
+					<Button onClick={() => inspect()} disabled={loading || !input.trim()}>
 						{loading ? <Spinner size="sm" /> : "Inspect"}
 					</Button>
 				</HStack>

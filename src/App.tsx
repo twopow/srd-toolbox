@@ -13,6 +13,10 @@ import InspectorSection from "@/components/InspectorSection";
 import { FaGithub } from "react-icons/fa6";
 
 
+const defaultTab = new URLSearchParams(window.location.search).has("r")
+  ? "inspector"
+  : "about";
+
 export default function App() {
   return (
     <Container maxW="3xl" py="8">
@@ -32,7 +36,7 @@ export default function App() {
           </Link>
         </HStack>
 
-        <Tabs.Root defaultValue="about" width="100%">
+        <Tabs.Root defaultValue={defaultTab} width="100%">
           <Tabs.List>
             <Tabs.Trigger value="about">About</Tabs.Trigger>
             <Tabs.Trigger value="generator">Generator</Tabs.Trigger>
