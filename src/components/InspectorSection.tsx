@@ -12,12 +12,12 @@ import {
 	Text,
 	VStack,
 } from "@chakra-ui/react";
-import { lookupSRDRecord } from "@/lib/dns";
+import { inspect as inspectInput, type InspectResult } from "@/lib/dns";
 import {
-	parseSRDRecord,
 	statusCodeLabel,
 	codeDescription,
 	refererDescription,
+	generateSRDRecord,
 	type SRDRecord,
 } from "@/lib/srd";
 
@@ -91,35 +91,16 @@ function ParsedDisplay({
 	);
 }
 
-function looksLikeRecord(input: string): boolean {
-	return input.includes("=");
-}
-
 export default function InspectorSection() {
 	const [input, setInput] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [rawRecord, setRawRecord] = useState<string | null>(null);
-	const [parsed, setParsed] = useState<SRDRecord | null>(null);
-	const [inspectedHost, setInspectedHost] = useState<string | null>(null);
+	const [result, setResult] = useState<InspectResult | null>(null);
 
 	const reset = useCallback(() => {
 		setError(null);
-		setRawRecord(null);
-		setParsed(null);
-		setInspectedHost(null);
+		setResult(null);
 	}, []);
-
-	const inspectRecord = (raw: string) => {
-		setRawRecord(raw);
-		try {
-			setParsed(parseSRDRecord(raw));
-		} catch (e) {
-			setError(
-				`Failed to parse record: ${e instanceof Error ? e.message : "Unknown error"}`,
-			);
-		}
-	};
 
 	const inspect = useCallback(
 		async (value?: string) => {
@@ -129,18 +110,15 @@ export default function InspectorSection() {
 			if (v !== input) setInput(v);
 
 			reset();
-
-			if (looksLikeRecord(v)) {
-				inspectRecord(v);
-				return;
-			}
-
 			setLoading(true);
-			setInspectedHost(v);
 
 			try {
-				const raw = await lookupSRDRecord(v);
-				inspectRecord(raw);
+				const r = await inspectInput(v);
+				console.log("inspect result", r);
+				setResult(r);
+				if (r.parseError) {
+					setError(`Failed to parse record: ${r.parseError}`);
+				}
 			} catch (e) {
 				setError(e instanceof Error ? e.message : "Unknown error");
 			} finally {
@@ -180,6 +158,15 @@ export default function InspectorSection() {
 				</HStack>
 			</Field.Root>
 
+			{loading && (
+				<VStack width="100%" py="8">
+					<Spinner size="lg" />
+					<Text fontSize="sm" color="fg.muted">
+						Inspecting record...
+					</Text>
+				</VStack>
+			)}
+
 			{error && (
 				<Alert.Root status="error">
 					<Alert.Indicator />
@@ -189,24 +176,36 @@ export default function InspectorSection() {
 				</Alert.Root>
 			)}
 
-			{rawRecord && (
+			{result?.loopDetected && (
+				<Alert.Root status="warning">
+					<Alert.Indicator />
+					<Alert.Content>
+						<Alert.Title>Loop detected</Alert.Title>
+						<Alert.Description>
+							This record creates a redirect loop. The destination
+							points back to a host that is also configured with
+							SRD, causing an infinite redirect cycle.
+						</Alert.Description>
+					</Alert.Content>
+				</Alert.Root>
+			)}
+
+			{result?.parsed && (
 				<Card.Root width="100%">
 					<Card.Body gap="4">
 						<Box>
 							<Text fontSize="sm" fontWeight="medium" mb="1">
-								{inspectedHost ? "Raw DNS Record" : "Record"}
+								Record
 							</Text>
 							<Code display="block" p="2" width="100%">
-								{rawRecord}
+								{generateSRDRecord(result.parsed)}
 							</Code>
 						</Box>
 
-						{parsed && (
-							<ParsedDisplay
-								parsed={parsed}
-								hostname={inspectedHost ?? undefined}
-							/>
-						)}
+						<ParsedDisplay
+							parsed={result.parsed}
+							hostname={result.hostname ?? undefined}
+						/>
 					</Card.Body>
 				</Card.Root>
 			)}

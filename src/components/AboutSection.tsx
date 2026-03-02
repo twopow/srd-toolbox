@@ -61,7 +61,7 @@ export default function AboutSection() {
             root domains with CNAME flattening
           </Text>
           <Text>
-            <strong>A record:</strong> <Code>34.56.76.181</Code> — for root
+            <strong>A record:</strong> <Code>34.123.249.80</Code> — for root
             domains
           </Text>
         </VStack>

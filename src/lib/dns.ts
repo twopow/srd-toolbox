@@ -1,38 +1,85 @@
-interface DohAnswer {
-	name: string;
-	type: number;
-	TTL: number;
-	data: string;
+import { parseSRDRecord, type SRDRecord } from "@/lib/srd";
+
+const INSPECT_URL = "https://in.srd.sh/inspect";
+
+interface APIInspectResponse {
+	host: string;
+	destination?: string;
+	code?: number;
+	preserve_route?: boolean;
+	referer_policy?: string;
+	not_found?: boolean;
+	loop?: boolean;
+	error?: string;
 }
 
-interface DohResponse {
-	Status: number;
-	Answer?: DohAnswer[];
+export interface InspectResult {
+	hostname: string | null;
+	parsed: SRDRecord | null;
+	parseError: string | null;
+	loopDetected: boolean;
 }
 
-export async function lookupSRDRecord(hostname: string): Promise<string> {
-	const name = `_srd.${hostname}`;
-	const url = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=TXT`;
+function looksLikeRecord(input: string): boolean {
+	return input.includes("=");
+}
 
-	const res = await fetch(url, {
-		headers: { Accept: "application/dns-json" },
-	});
+function parseRecord(raw: string): {
+	parsed: SRDRecord | null;
+	parseError: string | null;
+} {
+	try {
+		return { parsed: parseSRDRecord(raw), parseError: null };
+	} catch (e) {
+		return {
+			parsed: null,
+			parseError: e instanceof Error ? e.message : "Unknown error",
+		};
+	}
+}
+
+function toSRDRecord(data: APIInspectResponse): SRDRecord {
+	return {
+		version: "srd1",
+		dest: data.destination ?? "",
+		code: (data.code ?? 302) as SRDRecord["code"],
+		route: data.preserve_route ?? false,
+		referer: (data.referer_policy ?? "host") as SRDRecord["referer"],
+	};
+}
+
+async function inspectHostname(hostname: string): Promise<InspectResult> {
+	const res = await fetch(
+		`${INSPECT_URL}?host=${encodeURIComponent(hostname)}`,
+	);
 
 	if (!res.ok) {
-		throw new Error(`DNS lookup failed: HTTP ${res.status}`);
+		throw new Error(`Inspect request failed: HTTP ${res.status}`);
 	}
 
-	const data: DohResponse = await res.json();
+	const data: APIInspectResponse = await res.json();
 
-	if (data.Status !== 0) {
-		throw new Error(`DNS lookup failed: status ${data.Status}`);
+	if (data.error) {
+		throw new Error(data.error);
 	}
 
-	const txtRecords = (data.Answer ?? []).filter((a) => a.type === 16);
-
-	if (txtRecords.length === 0) {
-		throw new Error(`No _srd TXT record found for ${hostname}`);
+	if (data.not_found) {
+		throw new Error(`No SRD record found for ${hostname}`);
 	}
 
-	return txtRecords[0].data;
+	return {
+		hostname,
+		parsed: toSRDRecord(data),
+		parseError: null,
+		loopDetected: data.loop ?? false,
+	};
+}
+
+export async function inspect(input: string): Promise<InspectResult> {
+	if (looksLikeRecord(input)) {
+		const { parsed, parseError } = parseRecord(input);
+		return { hostname: null, parsed, parseError, loopDetected: false };
+	}
+
+	return inspectHostname(input);
 }
